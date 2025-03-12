@@ -264,8 +264,6 @@ svc-page {
   }
 
   & > .svc-question__drag-area {
-    z-index: 1;
-
     .svc-question__drag-element {
       width: var(--ctr-survey-page-drag-indicator-width, var(--lbr-size-x3));
       height: var(--ctr-survey-page-drag-indicator-height, var(--lbr-size-x2));
