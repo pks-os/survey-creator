@@ -36,7 +36,6 @@ import {
   settings as creatorSettings
 } from "../creator-settings";
 import { QuestionFactory } from "survey-core";
-import { defaultCss } from "survey-core";
 import { SurveyHelper } from "../survey-helper";
 import { ISurveyPropertyGridDefinition } from "../question-editor/definition";
 import { parsePropertyDescription } from "./description-parser";
@@ -378,6 +377,15 @@ export class PropertyGridTitleActionsCreator {
       options.titleActions = actions;
     }
   }
+  public onValueChanged(obj: any, property: JsonObjectProperty, question: Question): void {
+    const editor = PropertyGridEditorCollection.getEditor(property);
+    if(!!editor && !!editor.createPropertyEditorSetup && !!editor.isPropertyEditorSetupEnabled) {
+      const act = question.getTitleToolbar().getActionById("property-grid-setup");
+      if(!!act) {
+        act.enabled = editor.isPropertyEditorSetupEnabled(obj, property, question, this.options);
+      }
+    }
+  }
   private createClearValueAction(
     editor: IPropertyGridEditor,
     property: JsonObjectProperty,
@@ -468,6 +476,8 @@ export class PropertyGridTitleActionsCreator {
     return question.descriptionLocation != "hidden" ? "icon-description-hide" : "icon-description";
   }
 }
+
+Serializer.addProperty("panelbase", { name: "iconName", visible: false });
 
 export class PropertyJSONGenerator {
   public static isPropertyReadOnly(
@@ -579,17 +589,8 @@ export class PropertyJSONGenerator {
       this.options.onPropertyEditorCreatedCallback(this.obj, prop, q);
     }
   }
-  private getVisibilityOnEvent(
-    prop: JsonObjectProperty,
-    showMode: string = ""
-  ): boolean {
-    return this.options.onCanShowPropertyCallback(
-      this.obj,
-      <any>prop,
-      showMode,
-      this.parentObj,
-      <any>this.parentProperty
-    );
+  private getVisibilityOnEvent(prop: JsonObjectProperty): boolean {
+    return this.options.onCanShowPropertyCallback(this.obj, <any>prop, undefined, this.parentObj, <any>this.parentProperty);
   }
   private isPropertyReadOnly(prop: JsonObjectProperty): boolean {
     return PropertyJSONGenerator.isPropertyReadOnly(
@@ -665,7 +666,7 @@ export class PropertyJSONGenerator {
     return json;
   }
   private createPanelProps(tab: SurveyQuestionEditorTabDefinition, context: string, isChild: boolean = false): any {
-    var panel = this.createPanelJSON(tab.name, tab.title, isChild);
+    var panel = this.createPanelJSON(tab.name, tab.title, tab.iconName, isChild);
     for (var i = 0; i < tab.properties.length; i++) {
       var propDef = tab.properties[i];
       var propJSON = this.createQuestionJSON(this.obj, <any>propDef.property, propDef.title, false, context);
@@ -696,10 +697,11 @@ export class PropertyJSONGenerator {
     json.titleLocation = "left";
     json.minWidth = "50px";
   }
-  private createPanelJSON(category: string, title: string, isChild: boolean): any {
+  private createPanelJSON(category: string, title: string, iconName: string, isChild: boolean): any {
     const res: any = {
       type: "panel",
       name: category,
+      iconName: iconName,
       title: this.getPanelTitle(category, title),
       elements: []
     };
@@ -715,9 +717,8 @@ export class PropertyJSONGenerator {
     isColumn: boolean = false,
     context: string
   ): any {
-    var isVisible = this.isPropertyVisible(prop, isColumn ? "list" : "");
-    if (!isVisible && isColumn) return null;
-    var json = PropertyGridEditorCollection.getJSON(
+    //if(isColumn && !SurveyHelper.isPropertyVisible(this.obj, prop, undefined, isColumn ? "list" : "")) return null;
+    const json = PropertyGridEditorCollection.getJSON(
       obj, prop, this.options, context, this.propertyGridDefinition
     );
     if (!json) return null;
@@ -769,13 +770,6 @@ export class PropertyJSONGenerator {
       delete json.isReadOnly;
     }
     return json;
-  }
-  private isPropertyVisible(
-    prop: JsonObjectProperty,
-    showMode: string
-  ): boolean {
-    if (!prop.visible) return false;
-    return !showMode || !prop.showMode || showMode == prop.showMode;
   }
   private getPanelTitle(name: string, title: string): string {
     if (!!title) return title;
@@ -1352,6 +1346,8 @@ export class PropertyGridModel {
     if (!!cellQuestion) {
       this.changeDependedProperties(cellQuestion, (name: string): Question => { return options.row.getQuestionByName(name); },
         (name: string): any => { return options.row.getValue(name); });
+      const matrix = options.question;
+      this.titleActionsCreator.onValueChanged(matrix.obj, matrix.property, matrix);
     }
     PropertyGridEditorCollection.onMatrixCellValueChanged(
       this.obj,
@@ -1444,9 +1440,6 @@ export abstract class PropertyGridEditor implements IPropertyGridEditor {
       options
     );
     if (!surveyPropertyEditor) return null;
-    if (property.type !== "condition") {
-      surveyPropertyEditor.editSurvey.css = defaultCss;
-    }
     if (question.isReadOnly) {
       surveyPropertyEditor.editSurvey.mode = "display";
     }

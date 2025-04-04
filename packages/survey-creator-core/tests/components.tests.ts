@@ -10,7 +10,7 @@ import { CreatorTester } from "./creator-tester";
 import { LogoImageViewModel } from "../src/components/header/logo-image";
 import { imageMimeTypes } from "../src/utils/utils";
 import { calculateDragOverLocation } from "../src/dragdrop-survey-elements";
-import { DropIndicatorPosition } from "../src/drop-to-enum";
+import { DropIndicatorPosition } from "../src/drag-drop-enums";
 
 beforeEach(() => { });
 
@@ -1103,4 +1103,16 @@ test("QuestionImageAdornerViewModel updated on locale changed", () => {
 
   creator.survey.locale = "fr";
   expect(imageAdorner.isEmptyImageLink).toBeFalsy();
+});
+
+test("QuestionImageAdornerViewModel imageLinkValueChangedHandler", () => {
+  const creator = new CreatorTester();
+  const question = new QuestionImageModel("q1");
+  question.imageLink = "test";
+  const imageAdorner = new QuestionImageAdornerViewModel(creator, question, undefined as any, { getElementsByClassName: () => [{}] } as any);
+  expect(imageAdorner.isEmptyImageLink).toBeFalsy();
+  imageAdorner.detachFromUI();
+  expect(imageAdorner.question).toBeUndefined();
+  imageAdorner.imageLinkValueChangedHandler();
+  expect(imageAdorner.isEmptyImageLink).toBeTruthy();
 });

@@ -86,11 +86,13 @@ test("Check tabs creating", () => {
   var generalPanel = <PanelModel>propertyGrid.survey.getPanelByName("general");
   expect(generalPanel).toBeTruthy();
   expect(generalPanel.title).toEqual("General");
+  expect(generalPanel["iconName"]).toEqual("icon-pg-general-24x24");
   var actions = generalPanel.getTitleActions();
   expect(actions).toHaveLength(0);
   var choicesPanel = <PanelModel>propertyGrid.survey.getPanelByName("choices");
   expect(choicesPanel).toBeTruthy();
   expect(choicesPanel.title).toEqual("Choice Options");
+  expect(choicesPanel["iconName"]).toEqual("icon-pg-specific-24x24");
 });
 test("Categories titles", () => {
   enStrings.pe.tabs.layout.panel = "Panel Layout";
@@ -811,6 +813,28 @@ test("bindings property editor", () => {
   q.value = "q3";
   expect(matrix.bindings.getValueNameByPropertyName("rowCount")).toEqual("q3");
 });
+test("bindings property editor, store in JSON, Bug#6743", () => {
+  const survey = new SurveyModel({
+    elements: [
+      { type: "matrixdynamic", name: "q1" },
+      { type: "text", name: "q2" }
+    ]
+  });
+  const matrix = <QuestionMatrixDynamicModel>survey.getQuestionByName("q1");
+  const propertyGrid = new PropertyGridModelTester(matrix);
+  const bindingsQuestion = <QuestionCompositeModel>(
+    propertyGrid.survey.getQuestionByName("bindings")
+  );
+  expect(bindingsQuestion).toBeTruthy();
+  expect(bindingsQuestion.getType()).toEqual("propertygrid_bindings");
+  expect(bindingsQuestion.contentPanel.questions).toHaveLength(1);
+  const q = bindingsQuestion.contentPanel.questions[0];
+  expect(q.name).toEqual("rowCount");
+  q.value = "q2";
+  expect(matrix.bindings.getValueNameByPropertyName("rowCount")).toEqual("q2");
+  expect(matrix.toJSON()).toEqual({ name: "q1", bindings: { rowCount: "q2" } });
+  expect(survey.getQuestionByName("q2").toJSON()).toEqual({ name: "q2" });
+});
 
 test("Dynamic panel 'Panel count' binding property editor", () => {
   const survey = new SurveyModel({
@@ -1419,7 +1443,24 @@ test("options.onSetPropertyEditorOptionsCallback", () => {
   expect(actions[1].enabled).toBeFalsy();
   expect(updater()).toBeFalsy();
 });
-
+test("property-grid-setup action dynamic enabled property Bug#6751", () => {
+  const question1 = new QuestionDropdownModel("q1");
+  question1.choices = [1, 2, 3];
+  const propertyGrid = new PropertyGridModelTester(question1);
+  const choicesQuestion = <QuestionMatrixDynamicModel>(
+    propertyGrid.survey.getQuestionByName("choices")
+  );
+  const action = choicesQuestion.getTitleToolbar().getActionById("property-grid-setup");
+  expect(action).toBeTruthy();
+  expect(action.enabled).toBeTruthy();
+  const row = choicesQuestion.visibleRows[0];
+  row.showDetailPanel();
+  const visibleIfQuestion = row.detailPanel.getQuestionByName("visibleIf");
+  visibleIfQuestion.value = "1 = 1";
+  expect(action.enabled).toBeFalsy();
+  visibleIfQuestion.value = "";
+  expect(action.enabled).toBeTruthy();
+});
 test("options.onSetPropertyEditorOptionsCallback - allowBatchEdit", () => {
   const options = new EmptySurveyCreatorOptions();
   var propName = "";
@@ -3351,6 +3392,24 @@ test("Localication and survey.pages property, Bug#6687", () => {
 
   expect(creator.survey.pages.length).toBe(1);
   expect(creator.survey.pages[0].name).toBe("Seite1");
+});
+test("Localication and different locales, Bug#6717", () => {
+  const creator = new CreatorTester();
+  creator.JSON = {
+    elements: [
+      { type: "text", name: "q1", title: "Question 1", choices: [{ value: 1, text: "Item 1" }] }
+    ]
+  };
+  const question = creator.survey.getQuestionByName("q1");
+  let propertyGrid = new PropertyGridModelTester(question);
+  let titleQuestion = <QuestionTextModel>propertyGrid.survey.getQuestionByName("title");
+  expect(titleQuestion.value).toBe("Question 1");
+  expect(titleQuestion.placeholder).toBe("q1");
+  creator.survey.locale = "de";
+  propertyGrid = new PropertyGridModelTester(question);
+  titleQuestion = <QuestionTextModel>propertyGrid.survey.getQuestionByName("title");
+  expect(titleQuestion.value).toBeFalsy();
+  expect(titleQuestion.placeHolder).toBe("Question 1");
 });
 test("panellayoutcolumns doesn't have adding button", () => {
   const creator = new CreatorTester();
